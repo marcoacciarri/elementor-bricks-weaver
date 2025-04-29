@@ -1,3 +1,4 @@
+
 /**
  * Maps Elementor elements to React Bricks components
  */
@@ -15,6 +16,8 @@ export interface ReactBricksComponent {
   content?: string; // Store the original content
   tag?: string; // Store the HTML tag
   settings?: Record<string, any>; // Store the original settings
+  styles?: Record<string, string>; // Store the original styles
+  classes?: string[]; // Store the original classes
 }
 
 /**
