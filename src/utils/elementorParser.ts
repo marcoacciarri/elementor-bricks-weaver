@@ -2,7 +2,6 @@
 /**
  * Utilities for parsing Elementor HTML into structured data
  */
-import { JSDOM } from 'jsdom';
 
 export interface ElementorElement {
   id: string;
@@ -31,22 +30,22 @@ export const parseElementorPage = async (url: string): Promise<ParsedElementorPa
     const response = await fetch(url);
     const html = await response.text();
     
-    // Parse with JSDOM
-    const dom = new JSDOM(html);
-    const document = dom.window.document;
+    // Parse with browser's DOMParser
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
     
     // Get page title
-    const title = document.title || 'Untitled Page';
+    const title = doc.title || 'Untitled Page';
     
     // Find the main Elementor container
-    const elementorContainer = document.querySelector('.elementor');
+    const elementorContainer = doc.querySelector('.elementor');
     
     if (!elementorContainer) {
       throw new Error('No Elementor content found on the page');
     }
     
     // Extract global styles (typically in the head)
-    const globalStyles = extractGlobalStyles(document);
+    const globalStyles = extractGlobalStyles(doc);
     
     // Parse the Elementor elements hierarchy
     const elements = parseElementorElements(elementorContainer);
@@ -90,7 +89,8 @@ const parseElementorElements = (element: Element): ElementorElement[] => {
   const elements: ElementorElement[] = [];
   
   // Find all direct Elementor elements
-  const elementorElements = element.querySelectorAll(':scope > .elementor-element');
+  // Using Array.from to convert NodeList to Array for better compatibility
+  const elementorElements = Array.from(element.querySelectorAll(':scope > .elementor-element'));
   
   elementorElements.forEach(el => {
     // Extract the element ID
