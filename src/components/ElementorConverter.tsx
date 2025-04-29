@@ -11,10 +11,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const ElementorConverter = () => {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [parsedData, setParsedData] = useState<{
     title: string;
     elementCount: number;
@@ -26,6 +29,7 @@ const ElementorConverter = () => {
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUrl(e.target.value);
+    setError(null);
   };
 
   const handleFetch = async () => {
@@ -37,6 +41,7 @@ const ElementorConverter = () => {
     setLoading(true);
     setParsedData(null);
     setGeneratedCode('');
+    setError(null);
     
     try {
       const data = await parseElementorPage(url);
@@ -49,7 +54,9 @@ const ElementorConverter = () => {
       setActiveTab('elements');
     } catch (error) {
       console.error('Error fetching page:', error);
-      toast.error('Failed to fetch or parse the page');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch or parse the page';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -116,7 +123,7 @@ const ElementorConverter = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
+          <div className="flex gap-4 flex-col md:flex-row">
             <Input
               className="flex-grow"
               placeholder="https://example.com/elementor-page"
@@ -124,10 +131,24 @@ const ElementorConverter = () => {
               onChange={handleUrlChange}
               disabled={loading}
             />
-            <Button onClick={handleFetch} disabled={loading}>
+            <Button onClick={handleFetch} disabled={loading} className="whitespace-nowrap">
               {loading ? 'Fetching...' : 'Fetch Page'}
             </Button>
           </div>
+          
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>
+                {error}
+                <div className="mt-2 text-sm">
+                  Note: Due to browser security restrictions (CORS), you may not be able to fetch some external websites directly. 
+                  Try with a URL that allows cross-origin requests or use our proxy service.
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
 

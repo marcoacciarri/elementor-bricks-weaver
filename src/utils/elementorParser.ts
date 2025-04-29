@@ -26,8 +26,18 @@ export interface ParsedElementorPage {
  */
 export const parseElementorPage = async (url: string): Promise<ParsedElementorPage> => {
   try {
-    // Fetch the page HTML
-    const response = await fetch(url);
+    // Try to fetch with CORS proxy if direct fetch fails
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    const response = await fetch(proxyUrl, {
+      headers: {
+        'Content-Type': 'text/html',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch page: ${response.status} ${response.statusText}`);
+    }
+    
     const html = await response.text();
     
     // Parse with browser's DOMParser
