@@ -1,3 +1,4 @@
+
 /**
  * Generates React Bricks component code from the mapped component data
  */
@@ -739,3 +740,328 @@ const generateButtonJSX = (component: ReactBricksComponent): string => {
   
   // Button size
   const isBigButton = component.classes?.some(cls => cls.includes('elementor-size-lg') || cls.includes('elementor-size-xl'));
+  
+  let jsx = '';
+  jsx += '    <Link\n';
+  jsx += '      href={href || "#"}\n';
+  jsx += '      target={isTargetBlank ? "_blank" : undefined}\n';
+  jsx += '      className={classNames(\n';
+  jsx += '        "inline-block rounded-md font-bold transition-all ease-out duration-150",\n';
+  jsx += '        isBigButton ? "px-8 py-4 text-lg" : "px-5 py-3 text-base",\n';
+  jsx += '        type === "solid" && buttonColor === "blue" && "bg-blue-600 hover:bg-blue-700 text-white",\n';
+  jsx += '        type === "solid" && buttonColor === "green" && "bg-green-600 hover:bg-green-700 text-white",\n';
+  jsx += '        type === "outline" && "border-2 bg-transparent",\n';
+  jsx += '        type === "outline" && buttonColor === "blue" && "border-blue-600 hover:border-blue-700 text-blue-600 hover:text-blue-700",\n';
+  jsx += '        type === "link" && "px-0 py-0 bg-transparent hover:-translate-y-1",\n';
+  jsx += '        type === "link" && buttonColor === "blue" && "text-blue-600 hover:text-blue-700"\n';
+  jsx += '      )}\n';
+  jsx += '    >\n';
+  jsx += '      {text}\n';
+  jsx += '    </Link>\n';
+  
+  return jsx;
+};
+
+/**
+ * Generate JSX for a Video component
+ */
+const generateVideoJSX = (component: ReactBricksComponent): string => {
+  // Determine video type and source
+  let videoType = component.props.type || 'streaming';
+  let videoId = component.props.videoId || '';
+  let videoUrl = '';
+  let videoPlatform = component.props.platform || 'youtube';
+  
+  // Try to extract from content or settings
+  if (component.content) {
+    if (component.content.includes('youtube')) {
+      const youtubeMatch = component.content.match(/youtube.com\/embed\/([^"&?/\s]+)/);
+      if (youtubeMatch && youtubeMatch[1]) {
+        videoId = youtubeMatch[1];
+        videoPlatform = 'youtube';
+      }
+    } else if (component.content.includes('vimeo')) {
+      const vimeoMatch = component.content.match(/vimeo.com\/(?:video\/)?([0-9]+)/);
+      if (vimeoMatch && vimeoMatch[1]) {
+        videoId = vimeoMatch[1];
+        videoPlatform = 'vimeo';
+      }
+    } else if (component.content.includes('.mp4') || component.content.includes('.webm')) {
+      videoType = 'file';
+      const videoMatch = component.content.match(/src=["'](.*?\.(?:mp4|webm|ogg))["']/);
+      if (videoMatch && videoMatch[1]) {
+        videoUrl = videoMatch[1];
+      }
+    }
+  }
+  
+  let jsx = '';
+  jsx += '    <div className="aspect-w-16 aspect-h-9 w-full overflow-hidden rounded-lg">\n';
+  
+  if (videoType === 'streaming' && videoId) {
+    jsx += '      <iframe\n';
+    jsx += '        className="w-full h-full"\n';
+    jsx += '        src={\n';
+    jsx += `          videoPlatform === "youtube"\n`;
+    jsx += `            ? "https://www.youtube.com/embed/${videoId}"\n`;
+    jsx += `            : "https://player.vimeo.com/video/${videoId}"\n`;
+    jsx += '        }\n';
+    jsx += '        title="Video player"\n';
+    jsx += '        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"\n';
+    jsx += '        allowFullScreen\n';
+    jsx += '      />\n';
+  } else {
+    jsx += '      <Video\n';
+    jsx += '        controls\n';
+    jsx += '        className="w-full h-full"\n';
+    jsx += '        autoPlay={false}\n';
+    jsx += '        muted={false}\n';
+    if (videoUrl) {
+      jsx += `        src="${videoUrl}"\n`;
+    } else {
+      jsx += '        src={videoFile?.url || ""}\n';
+    }
+    jsx += '      />\n';
+  }
+  
+  jsx += '    </div>\n';
+  
+  return jsx;
+};
+
+/**
+ * Generate JSX for a generic widget when no specific mapping exists
+ */
+const generateGenericWidgetJSX = (component: ReactBricksComponent): string => {
+  let jsx = '';
+  
+  jsx += '    <div className="p-4 border border-gray-200 rounded-md">\n';
+  jsx += '      <div className="text-sm text-gray-500 mb-2">Generic Component</div>\n';
+  
+  // If content is available, render it
+  if (component.content) {
+    jsx += '      <div dangerouslySetInnerHTML={{ __html: `\n';
+    jsx += `        ${component.content.replace(/`/g, '\\`')}\n`;
+    jsx += '      ` }} />\n';
+  } else {
+    jsx += `      <div>Component: ${component.name || component.type || 'Unknown'}</div>\n`;
+  }
+  
+  jsx += '    </div>\n';
+  
+  return jsx;
+};
+
+/**
+ * Generate React Bricks schema
+ */
+const generateSchema = (component: ReactBricksComponent): string => {
+  const componentName = pascalCase(component.name);
+  
+  let schema = `\n${componentName}.schema = {\n`;
+  schema += `  name: '${component.name}',\n`;
+  schema += `  label: '${component.label}',\n`;
+  schema += `  category: '${component.category}',\n`;
+  
+  // Add component-specific schema properties
+  if (component.type === 'section' || component.name.includes('section')) {
+    schema += '  sideEditProps: [\n';
+    schema += '    backgroundSideGroup,\n';
+    schema += '    paddingBordersSideGroup,\n';
+    schema += '  ],\n';
+    
+    schema += '  getDefaultProps: () => ({\n';
+    schema += '    backgroundColor: { color: "white", className: "bg-white" },\n';
+    schema += '    borderTop: false,\n';
+    schema += '    borderBottom: false,\n';
+    schema += '    paddingTop: "0",\n';
+    schema += '    paddingBottom: "0",\n';
+    schema += '  }),\n';
+  } else if (component.type === 'heading' || component.name.includes('heading')) {
+    schema += '  sideEditProps: [\n';
+    schema += '    {\n';
+    schema += '      name: "tag",\n';
+    schema += '      label: "Tag",\n';
+    schema += '      type: types.SideEditPropType.Select,\n';
+    schema += '      selectOptions: [\n';
+    schema += '        { value: "h1", label: "H1" },\n';
+    schema += '        { value: "h2", label: "H2" },\n';
+    schema += '        { value: "h3", label: "H3" },\n';
+    schema += '        { value: "h4", label: "H4" },\n';
+    schema += '        { value: "h5", label: "H5" },\n';
+    schema += '        { value: "h6", label: "H6" },\n';
+    schema += '      ],\n';
+    schema += '    },\n';
+    schema += '    {\n';
+    schema += '      name: "extraBoldTitle",\n';
+    schema += '      label: "Extra Bold",\n';
+    schema += '      type: types.SideEditPropType.Boolean,\n';
+    schema += '    },\n';
+    schema += '  ],\n';
+    
+    schema += '  getDefaultProps: () => ({\n';
+    schema += '    title: { text: "Heading" },\n';
+    schema += '    tag: "h2",\n';
+    schema += '    extraBoldTitle: false,\n';
+    schema += '  }),\n';
+  } else if (component.type === 'text-editor' || component.name.includes('text')) {
+    schema += '  sideEditProps: [\n';
+    schema += '    {\n';
+    schema += '      name: "textAlign",\n';
+    schema += '      label: "Text Align",\n';
+    schema += '      type: types.SideEditPropType.Select,\n';
+    schema += '      selectOptions: [\n';
+    schema += '        { value: "left", label: "Left" },\n';
+    schema += '        { value: "center", label: "Center" },\n';
+    schema += '        { value: "right", label: "Right" },\n';
+    schema += '      ],\n';
+    schema += '    },\n';
+    schema += '  ],\n';
+    
+    schema += '  getDefaultProps: () => ({\n';
+    schema += '    text: {\n';
+    schema += '      text: "Text content goes here."\n';
+    schema += '    },\n';
+    schema += '    textAlign: "left",\n';
+    schema += '  }),\n';
+  } else if (component.type === 'image' || component.name.includes('image')) {
+    schema += '  sideEditProps: [\n';
+    schema += '    {\n';
+    schema += '      name: "isRounded",\n';
+    schema += '      label: "Rounded",\n';
+    schema += '      type: types.SideEditPropType.Boolean,\n';
+    schema += '    },\n';
+    schema += '    {\n';
+    schema += '      name: "hasShadow",\n';
+    schema += '      label: "Shadow",\n';
+    schema += '      type: types.SideEditPropType.Boolean,\n';
+    schema += '    },\n';
+    schema += '  ],\n';
+    
+    schema += '  getDefaultProps: () => ({\n';
+    schema += '    imageSource: {\n';
+    schema += '      src: photos.DESK_MAC.src,\n';
+    schema += '      alt: photos.DESK_MAC.alt,\n';
+    schema += '      placeholderSrc: photos.DESK_MAC.placeholderSrc,\n';
+    schema += '    },\n';
+    schema += '    isRounded: false,\n';
+    schema += '    hasShadow: false,\n';
+    schema += '  }),\n';
+  } else if (component.type === 'button' || component.name.includes('button')) {
+    schema += '  sideEditProps: [\n';
+    schema += '    {\n';
+    schema += '      name: "text",\n';
+    schema += '      label: "Button text",\n';
+    schema += '      type: types.SideEditPropType.Text,\n';
+    schema += '    },\n';
+    schema += '    {\n';
+    schema += '      name: "href",\n';
+    schema += '      label: "Link",\n';
+    schema += '      type: types.SideEditPropType.Text,\n';
+    schema += '    },\n';
+    schema += '    {\n';
+    schema += '      name: "isTargetBlank",\n';
+    schema += '      label: "Open in new tab",\n';
+    schema += '      type: types.SideEditPropType.Boolean,\n';
+    schema += '    },\n';
+    schema += '    {\n';
+    schema += '      name: "type",\n';
+    schema += '      label: "Type",\n';
+    schema += '      type: types.SideEditPropType.Select,\n';
+    schema += '      selectOptions: [\n';
+    schema += '        { value: "solid", label: "Solid" },\n';
+    schema += '        { value: "outline", label: "Outline" },\n';
+    schema += '        { value: "link", label: "Link" },\n';
+    schema += '      ],\n';
+    schema += '    },\n';
+    schema += '    {\n';
+    schema += '      name: "buttonColor",\n';
+    schema += '      label: "Color",\n';
+    schema += '      type: types.SideEditPropType.Select,\n';
+    schema += '      selectOptions: buttonColors,\n';
+    schema += '    },\n';
+    schema += '    {\n';
+    schema += '      name: "isBigButton",\n';
+    schema += '      label: "Big",\n';
+    schema += '      type: types.SideEditPropType.Boolean,\n';
+    schema += '    },\n';
+    schema += '  ],\n';
+    
+    schema += '  getDefaultProps: () => ({\n';
+    schema += '    text: "Button",\n';
+    schema += '    href: "#",\n';
+    schema += '    type: "solid",\n';
+    schema += '    buttonColor: "blue",\n';
+    schema += '    isTargetBlank: false,\n';
+    schema += '    isBigButton: false,\n';
+    schema += '  }),\n';
+  } else if (component.type === 'video' || component.name.includes('video')) {
+    schema += '  sideEditProps: [\n';
+    schema += '    {\n';
+    schema += '      name: "type",\n';
+    schema += '      label: "Video Type",\n';
+    schema += '      type: types.SideEditPropType.Select,\n';
+    schema += '      selectOptions: [\n';
+    schema += '        { value: "streaming", label: "Streaming (YouTube/Vimeo)" },\n';
+    schema += '        { value: "file", label: "Video File" },\n';
+    schema += '      ],\n';
+    schema += '    },\n';
+    schema += '    {\n';
+    schema += '      name: "platform",\n';
+    schema += '      label: "Platform",\n';
+    schema += '      type: types.SideEditPropType.Select,\n';
+    schema += '      selectOptions: [\n';
+    schema += '        { value: "youtube", label: "YouTube" },\n';
+    schema += '        { value: "vimeo", label: "Vimeo" },\n';
+    schema += '      ],\n';
+    schema += '      show: (props) => props.type === "streaming",\n';
+    schema += '    },\n';
+    schema += '    {\n';
+    schema += '      name: "videoId",\n';
+    schema += '      label: "Video ID",\n';
+    schema += '      type: types.SideEditPropType.Text,\n';
+    schema += '      show: (props) => props.type === "streaming",\n';
+    schema += '    },\n';
+    schema += '    {\n';
+    schema += '      name: "videoFile",\n';
+    schema += '      label: "Video File",\n';
+    schema += '      type: types.SideEditPropType.File,\n';
+    schema += '      show: (props) => props.type === "file",\n';
+    schema += '    },\n';
+    schema += '  ],\n';
+    
+    schema += '  getDefaultProps: () => ({\n';
+    schema += '    type: "streaming",\n';
+    schema += '    platform: "youtube",\n';
+    schema += '    videoId: "dQw4w9WgXcQ", // Rick Astley\n';
+    schema += '    videoFile: null,\n';
+    schema += '  }),\n';
+  }
+  
+  schema += '};\n';
+  
+  return schema;
+};
+
+/**
+ * Utility function to convert string to PascalCase
+ */
+const pascalCase = (str: string): string => {
+  return str
+    .split(/[-_\s.]+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join('');
+};
+
+/**
+ * Utility to determine TypeScript type for a prop value
+ */
+const determinePropType = (value: any): string => {
+  if (value === null || value === undefined) return 'any';
+  if (typeof value === 'boolean') return 'boolean';
+  if (typeof value === 'number') return 'number';
+  if (typeof value === 'string') return 'string';
+  if (Array.isArray(value)) return 'any[]';
+  if (typeof value === 'object') return 'Record<string, any>';
+  return 'any';
+};
