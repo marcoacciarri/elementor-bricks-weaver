@@ -1,4 +1,3 @@
-
 /**
  * Maps Elementor elements to React Bricks components
  */
@@ -12,6 +11,10 @@ export interface ReactBricksComponent {
   props: Record<string, any>;
   children?: ReactBricksComponent[];
   repeaterItems?: Record<string, any[]>;
+  type?: string; // Store the original Elementor element type
+  content?: string; // Store the original content
+  tag?: string; // Store the HTML tag
+  settings?: Record<string, any>; // Store the original settings
 }
 
 /**
@@ -27,7 +30,11 @@ export const mapElementorToReactBricks = (
     label: elementorTypeToComponentLabel(element.type),
     category: determineCategoryFromType(element.type),
     props: mapElementorSettingsToProps(element),
-    children: []
+    children: [],
+    type: element.type, // Store original type
+    content: element.content, // Store original content
+    tag: element.tag, // Store original tag
+    settings: element.settings // Store original settings
   };
 
   // Handle specific element types

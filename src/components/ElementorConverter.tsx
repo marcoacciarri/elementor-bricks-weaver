@@ -11,8 +11,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Copy, FileCode } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from '@/components/ui/badge';
 
 const ElementorConverter = () => {
   const [url, setUrl] = useState('');
@@ -42,6 +43,7 @@ const ElementorConverter = () => {
     setParsedData(null);
     setGeneratedCode('');
     setError(null);
+    setSelectedElement(null);
     
     try {
       const data = await parseElementorPage(url);
@@ -82,6 +84,47 @@ const ElementorConverter = () => {
       toast.success('Code copied to clipboard');
     }
   };
+  
+  const findElement = (elements: ElementorElement[], id: string): ElementorElement | undefined => {
+    for (const element of elements) {
+      if (element.id === id) {
+        return element;
+      }
+      if (element.children && element.children.length > 0) {
+        const found = findElement(element.children, id);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+
+  const getElementTypeLabel = (type: string): string => {
+    const mapping: Record<string, string> = {
+      'section': 'Section',
+      'column': 'Column',
+      'heading': 'Heading',
+      'text-editor': 'Text',
+      'image': 'Image',
+      'button': 'Button',
+      'video': 'Video',
+    };
+    
+    return mapping[type] || type.replace('widget-', '').charAt(0).toUpperCase() + type.replace('widget-', '').slice(1);
+  };
+  
+  const getElementBadgeColor = (type: string): string => {
+    const mapping: Record<string, string> = {
+      'section': 'bg-purple-500',
+      'column': 'bg-blue-500',
+      'heading': 'bg-green-500',
+      'text-editor': 'bg-amber-500',
+      'image': 'bg-rose-500',
+      'button': 'bg-cyan-500',
+      'video': 'bg-orange-500',
+    };
+    
+    return mapping[type] || 'bg-gray-500';
+  };
 
   const renderElementTree = (elements: ElementorElement[], level = 0) => {
     return (
@@ -92,17 +135,23 @@ const ElementorConverter = () => {
               <Button 
                 variant={selectedElement === element.id ? "default" : "ghost"}
                 size="sm"
-                className="text-left justify-start h-auto py-1 font-normal"
+                className="text-left justify-start h-auto py-1 font-normal flex items-center w-full"
                 onClick={() => generateComponent(element)}
               >
-                <span className="mr-1">
-                  {element.type} 
+                <span className="flex items-center">
+                  <Badge className={`mr-2 text-xs ${getElementBadgeColor(element.type)}`}>
+                    {getElementTypeLabel(element.type)}
+                  </Badge>
                   {element.type === 'heading' && element.content 
-                    ? `: ${element.content.replace(/<[^>]*>/g, '').substring(0, 20)}...` 
+                    ? <span className="truncate max-w-[180px]">{element.content.replace(/<[^>]*>/g, '').substring(0, 20)}{element.content.length > 20 ? '...' : ''}</span> 
+                    : element.type === 'text-editor' && element.content
+                    ? <span className="truncate max-w-[180px]">{element.content.replace(/<[^>]*>/g, '').substring(0, 20)}{element.content.length > 20 ? '...' : ''}</span>
+                    : element.type === 'button' && element.content?.includes('<span class="elementor-button-text">')
+                    ? <span className="truncate max-w-[180px]">{element.content.match(/<span class="elementor-button-text">(.*?)<\/span>/)?.[1] || ''}</span>
                     : ''}
                 </span>
-                <span className="text-xs text-muted-foreground ml-1">
-                  (ID: {element.id.substring(0, 6)}...)
+                <span className="text-xs text-muted-foreground ml-auto">
+                  ID: {element.id.substring(0, 6)}...
                 </span>
               </Button>
             </div>
@@ -181,13 +230,24 @@ const ElementorConverter = () => {
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsContent value="elements">
                   <ScrollArea className="h-[400px]">
-                    {selectedElement ? (
+                    {selectedElement && parsedData ? (
                       <div>
-                        <h3 className="font-medium mb-2">Element Properties:</h3>
+                        <div className="flex items-center mb-2">
+                          <h3 className="font-medium">Element Properties:</h3>
+                          {selectedElement && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="ml-auto"
+                              onClick={() => generateComponent(findElement(parsedData.elements, selectedElement) as ElementorElement)}
+                            >
+                              <FileCode className="h-4 w-4 mr-1" /> Generate Code
+                            </Button>
+                          )}
+                        </div>
                         <pre className="bg-slate-100 p-3 rounded-md text-xs overflow-auto">
                           {JSON.stringify(
-                            parsedData.elements.find(e => e.id === selectedElement) ||
-                            parsedData.elements.flatMap(e => e.children || []).find(e => e.id === selectedElement),
+                            findElement(parsedData.elements, selectedElement),
                             null,
                             2
                           )}
@@ -203,11 +263,18 @@ const ElementorConverter = () => {
                 <TabsContent value="code">
                   <ScrollArea className="h-[400px] relative">
                     {generatedCode ? (
-                      <Textarea 
-                        value={generatedCode} 
-                        readOnly 
-                        className="font-mono text-sm h-[390px]"
-                      />
+                      <>
+                        <div className="absolute top-2 right-2 z-10">
+                          <Button onClick={copyCode} size="sm" variant="secondary">
+                            <Copy className="h-4 w-4 mr-1" /> Copy
+                          </Button>
+                        </div>
+                        <Textarea 
+                          value={generatedCode} 
+                          readOnly 
+                          className="font-mono text-sm h-[390px]"
+                        />
+                      </>
                     ) : (
                       <div className="text-center text-muted-foreground py-8">
                         Generate code from an element to see the React Bricks component
@@ -220,7 +287,7 @@ const ElementorConverter = () => {
             <CardFooter>
               {generatedCode && (
                 <Button onClick={copyCode} className="ml-auto">
-                  Copy Code
+                  <Copy className="h-4 w-4 mr-2" /> Copy Code
                 </Button>
               )}
             </CardFooter>
@@ -239,7 +306,7 @@ const ElementorConverter = () => {
           <div className="text-sm space-y-3">
             <p>1. Enter the URL of an Elementor-based WordPress page.</p>
             <p>2. Click "Fetch Page" to parse the Elementor elements.</p>
-            <p>3. Browse the element tree and select elements to convert.</p>
+            <p>3. Browse the element tree and select elements to view details.</p>
             <p>4. Generate React Bricks components for the selected elements.</p>
             <p>5. Review and copy the generated code.</p>
             <p>6. Paste the code into your React Bricks project.</p>
