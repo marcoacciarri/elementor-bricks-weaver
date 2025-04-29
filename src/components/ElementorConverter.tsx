@@ -178,42 +178,44 @@ const ElementorConverter = () => {
               </Tabs>
             </CardHeader>
             <CardContent>
-              <TabsContent value="elements">
-                <ScrollArea className="h-[400px]">
-                  {selectedElement ? (
-                    <div>
-                      <h3 className="font-medium mb-2">Element Properties:</h3>
-                      <pre className="bg-slate-100 p-3 rounded-md text-xs overflow-auto">
-                        {JSON.stringify(
-                          parsedData.elements.find(e => e.id === selectedElement) ||
-                          parsedData.elements.flatMap(e => e.children || []).find(e => e.id === selectedElement),
-                          null,
-                          2
-                        )}
-                      </pre>
-                    </div>
-                  ) : (
-                    <div className="text-center text-muted-foreground py-8">
-                      Select an element from the list to view its details
-                    </div>
-                  )}
-                </ScrollArea>
-              </TabsContent>
-              <TabsContent value="code">
-                <ScrollArea className="h-[400px] relative">
-                  {generatedCode ? (
-                    <Textarea 
-                      value={generatedCode} 
-                      readOnly 
-                      className="font-mono text-sm h-[390px]"
-                    />
-                  ) : (
-                    <div className="text-center text-muted-foreground py-8">
-                      Generate code from an element to see the React Bricks component
-                    </div>
-                  )}
-                </ScrollArea>
-              </TabsContent>
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsContent value="elements">
+                  <ScrollArea className="h-[400px]">
+                    {selectedElement ? (
+                      <div>
+                        <h3 className="font-medium mb-2">Element Properties:</h3>
+                        <pre className="bg-slate-100 p-3 rounded-md text-xs overflow-auto">
+                          {JSON.stringify(
+                            parsedData.elements.find(e => e.id === selectedElement) ||
+                            parsedData.elements.flatMap(e => e.children || []).find(e => e.id === selectedElement),
+                            null,
+                            2
+                          )}
+                        </pre>
+                      </div>
+                    ) : (
+                      <div className="text-center text-muted-foreground py-8">
+                        Select an element from the list to view its details
+                      </div>
+                    )}
+                  </ScrollArea>
+                </TabsContent>
+                <TabsContent value="code">
+                  <ScrollArea className="h-[400px] relative">
+                    {generatedCode ? (
+                      <Textarea 
+                        value={generatedCode} 
+                        readOnly 
+                        className="font-mono text-sm h-[390px]"
+                      />
+                    ) : (
+                      <div className="text-center text-muted-foreground py-8">
+                        Generate code from an element to see the React Bricks component
+                      </div>
+                    )}
+                  </ScrollArea>
+                </TabsContent>
+              </Tabs>
             </CardContent>
             <CardFooter>
               {generatedCode && (
