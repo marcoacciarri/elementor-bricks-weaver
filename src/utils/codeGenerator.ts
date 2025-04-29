@@ -1,3 +1,4 @@
+
 /**
  * Generates React Bricks component code from the mapped component data
  */
@@ -603,7 +604,7 @@ const generateTextJSX = (component: ReactBricksComponent): string => {
   // Extract content for more specific template
   const textContent = component.content || 'Text content';
   const cleanContent = textContent.replace(/<\/?[^>]+(>|$)/g, '').trim();
-  const textAlign = component.styles.textAlign || component.props.textAlign || 'left';
+  const textAlign = component.styles?.textAlign || component.props.textAlign || 'left';
   
   let jsx = '';
   jsx += '    <RichText\n';
@@ -729,7 +730,7 @@ const generateButtonJSX = (component: ReactBricksComponent): string => {
   
   // Get button color from classes or settings
   let buttonColor = 'blue';
-  if (component.styles.backgroundColor) {
+  if (component.styles?.backgroundColor) {
     if (component.styles.backgroundColor.includes('blue')) buttonColor = 'blue';
     if (component.styles.backgroundColor.includes('green')) buttonColor = 'green';
     if (component.styles.backgroundColor.includes('red')) buttonColor = 'red';
@@ -738,4 +739,180 @@ const generateButtonJSX = (component: ReactBricksComponent): string => {
   }
   
   // Button size
-  const isBigButton = component.classes.some(cls => cls.includes('elementor-size-lg') || cls.includes('elementor-size-xl'));
+  const isBigButton = component.classes?.some(cls => cls.includes('elementor-size-lg') || cls.includes('elementor-size-xl'));
+  
+  let jsx = '';
+  jsx += '    <Link\n';
+  jsx += '      href={href || "#"}\n';
+  jsx += '      target={isTargetBlank ? "_blank" : undefined}\n';
+  jsx += '      rel={isTargetBlank ? "noopener noreferrer" : undefined}\n';
+  jsx += '      className={classNames(\n';
+  jsx += '        "inline-block px-5 py-3 rounded-md font-bold",\n';
+  jsx += '        "transition-all ease-out duration-150",\n';
+  jsx += '        isBigButton ? "text-lg px-7 py-4" : "",\n';
+  jsx += '        type === "solid" ? "text-white bg-blue-600 hover:bg-blue-700" :\n';
+  jsx += '        type === "outline" ? "text-blue-600 border-2 border-blue-600 hover:bg-blue-600 hover:text-white" :\n';
+  jsx += '        "text-blue-600 hover:underline"\n';
+  jsx += '      )}\n';
+  jsx += '    >\n';
+  jsx += `      {text || ${JSON.stringify(buttonText)}}\n`;
+  jsx += '    </Link>\n';
+  
+  return jsx;
+};
+
+/**
+ * Generate JSX for a Video component
+ */
+const generateVideoJSX = (component: ReactBricksComponent): string => {
+  // Determine video type (file or streaming)
+  let videoType = 'streaming';
+  let platform = 'youtube';
+  let videoId = '';
+  
+  // Check for YouTube embed
+  if (component.content?.includes('youtube')) {
+    const youtubeMatch = component.content.match(/youtube.com\/embed\/([^"&?/\s]+)/);
+    if (youtubeMatch && youtubeMatch[1]) {
+      videoId = youtubeMatch[1];
+    }
+  }
+  
+  // Check for Vimeo embed
+  else if (component.content?.includes('vimeo')) {
+    const vimeoMatch = component.content.match(/vimeo.com\/(?:video\/)?([0-9]+)/);
+    if (vimeoMatch && vimeoMatch[1]) {
+      platform = 'vimeo';
+      videoId = vimeoMatch[1];
+    }
+  }
+  
+  // Check for file video
+  else if (component.content?.includes('<video') || 
+          (component.settings?.video_type && component.settings.video_type === 'hosted')) {
+    videoType = 'file';
+  }
+  
+  let jsx = '';
+  jsx += '    <Video\n';
+  jsx += `      type="${videoType}"\n`;
+  
+  if (videoType === 'streaming' && videoId) {
+    jsx += `      platform="${platform}"\n`;
+    jsx += `      videoId="${videoId}"\n`;
+  } else {
+    jsx += '      videoFile={videoFile}\n';
+  }
+  
+  jsx += '      className="w-full aspect-video"\n';
+  jsx += '    />\n';
+  
+  return jsx;
+};
+
+/**
+ * Generate JSX for a generic widget
+ */
+const generateGenericWidgetJSX = (component: ReactBricksComponent): string => {
+  let jsx = '';
+  jsx += '    <div className="generic-widget">\n';
+  
+  if (component.content) {
+    jsx += '      <div dangerouslySetInnerHTML={{ __html: `\n';
+    jsx += `        ${component.content.replace(/`/g, '\\`')}\n`;
+    jsx += '      ` }} />\n';
+  } else {
+    jsx += `      {/* ${component.type || component.name} content */}\n`;
+  }
+  
+  jsx += '    </div>\n';
+  
+  return jsx;
+};
+
+/**
+ * Generate the schema for a React Bricks component
+ */
+const generateSchema = (component: ReactBricksComponent): string => {
+  const componentName = pascalCase(component.name);
+  
+  let schema = `\n${componentName}.schema = {\n`;
+  schema += `  name: '${kebabCase(component.name)}',\n`;
+  schema += `  label: '${component.label || componentName}',\n`;
+  schema += `  category: '${component.category || 'Content'}',\n`;
+  
+  // Generate default props based on component type
+  schema += '  getDefaultProps: () => ({\n';
+  
+  if (component.type === 'section' || component.name.includes('section')) {
+    schema += '    ...sectionDefaults,\n';
+  }
+  
+  if (component.type === 'heading' || component.name.includes('heading')) {
+    schema += '    title: { text: "Heading" },\n';
+    schema += '    tag: "h2",\n';
+    schema += '    extraBoldTitle: false,\n';
+  }
+  
+  if (component.type === 'text-editor' || component.name.includes('text')) {
+    schema += '    text: { text: "Text content" },\n';
+    schema += '    textAlign: "left",\n';
+  }
+  
+  if (component.type === 'image' || component.name.includes('image')) {
+    schema += '    imageSource: photos.DESK_MAC,\n';
+    schema += '    isRounded: false,\n';
+    schema += '    hasShadow: false,\n';
+  }
+  
+  schema += '  }),\n';
+  
+  // End schema
+  schema += '};\n';
+  
+  return schema;
+};
+
+/**
+ * Utility to convert string to PascalCase
+ */
+const pascalCase = (str: string): string => {
+  return str
+    .replace(/[-_](\w)/g, (_, c) => c.toUpperCase())
+    .replace(/^\w/, c => c.toUpperCase());
+};
+
+/**
+ * Utility to convert string to kebab-case
+ */
+const kebabCase = (str: string): string => {
+  return str
+    .replace(/([a-z])([A-Z])/g, '$1-$2')
+    .replace(/\s+/g, '-')
+    .replace(/_/g, '-')
+    .toLowerCase();
+};
+
+/**
+ * Determine TypeScript type for a prop based on its value
+ */
+const determinePropType = (value: any): string => {
+  if (value === undefined || value === null) return 'any';
+  
+  switch (typeof value) {
+    case 'string':
+      return 'string';
+    case 'number':
+      return 'number';
+    case 'boolean':
+      return 'boolean';
+    case 'object':
+      if (Array.isArray(value)) {
+        return 'any[]';
+      } else {
+        return 'Record<string, any>';
+      }
+    default:
+      return 'any';
+  }
+};
