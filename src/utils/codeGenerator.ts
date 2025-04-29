@@ -1,4 +1,3 @@
-
 /**
  * Generates React Bricks component code from the mapped component data
  */
@@ -287,15 +286,7 @@ const generateComponentBody = (component: ReactBricksComponent): string => {
         body += generateVideoJSX(component);
       } else {
         // Default fallback for other components
-        body += '    <div className="p-4 border rounded-md">\n';
-        body += `      <p>Generated component: ${component.name} (${component.type || 'unknown type'})</p>\n`;
-        if (component.content) {
-          body += '      <div className="mt-2 p-2 bg-gray-100 rounded text-sm">\n';
-          body += '        {/* Content preview */}\n';
-          body += '        <div dangerouslySetInnerHTML={{ __html: content }} />\n';
-          body += '      </div>\n';
-        }
-        body += '    </div>\n';
+        body += generateGenericWidgetJSX(component);
       }
   }
   
@@ -320,22 +311,36 @@ const generateSectionJSX = (component: ReactBricksComponent): string => {
   const hasImages = hasChildren && component.children.some(child => 
     child.type === 'image' || child.name.includes('image'));
   
+  // Extract background settings
+  const hasBgColor = component.props.backgroundColor && component.props.backgroundColor.className;
+  const hasBgImage = component.settings?.background_background === 'classic' && 
+                    component.settings?.background_image?.url;
+  
   let jsx = '';
   jsx += '    <Section\n';
   jsx += '      backgroundColor={backgroundColor}\n';
   jsx += '      borderTop={borderTop}\n';
   jsx += '      borderBottom={borderBottom}\n';
   
-  // Add any background image if present in props
-  if (component.props.backgroundImage) {
-    jsx += '      backgroundImage={backgroundImage}\n';
+  // Add any background image if present in settings
+  if (hasBgImage) {
+    jsx += `      backgroundImage={{ src: "${component.settings?.background_image?.url}" }}\n`;
   }
   
   jsx += '    >\n';
   jsx += '      <Container paddingTop={paddingTop} paddingBottom={paddingBottom}>\n';
   
+  // If there's a background color overlay
+  if (hasBgColor) {
+    jsx += '        <div className={classNames(\n';
+    jsx += '          "absolute inset-0 opacity-90 z-0",\n';
+    jsx += '          `${backgroundColor.className}`\n';
+    jsx += '        )}>\n';
+    jsx += '        </div>\n';
+  }
+  
   // Add content based on children
-  if (hasHeadings || hasText || hasButtons) {
+  if (hasHeadings || hasText || hasButtons || hasImages) {
     jsx += '        <div className="relative flex flex-col md:flex-row items-center">\n';
     
     // Create left/content side
@@ -344,93 +349,159 @@ const generateSectionJSX = (component: ReactBricksComponent): string => {
     jsx += '            textAlignClass\n';
     jsx += '          )}>\n';
     
-    // Add heading placeholders
-    if (hasHeadings) {
-      jsx += '            <RichText\n';
-      jsx += '              propName="title"\n';
-      jsx += '              value={title}\n';
-      jsx += '              renderBlock={(props) => (\n';
-      jsx += '                <h2\n';
-      jsx += '                  className={classNames(\n';
-      jsx += '                    "mt-0 text-2xl leading-7",\n';
-      jsx += '                    extraBoldTitle ? "font-extrabold" : "font-bold",\n';
-      jsx += '                    "mb-4",\n';
-      jsx += '                    titleColor\n';
-      jsx += '                  )}\n';
-      jsx += '                  {...props.attributes}\n';
-      jsx += '                >\n';
-      jsx += '                  {props.children}\n';
-      jsx += '                </h2>\n';
-      jsx += '              )}\n';
-      jsx += '              placeholder="Type a title..."\n';
-      jsx += '              allowedFeatures={[types.RichTextFeatures.Highlight]}\n';
-      jsx += '            />\n';
-    }
-    
-    // Add text placeholders
-    if (hasText) {
-      jsx += '            <RichText\n';
-      jsx += '              propName="text"\n';
-      jsx += '              value={text}\n';
-      jsx += '              renderBlock={(props) => (\n';
-      jsx += '                <p\n';
-      jsx += '                  className={classNames(\n';
-      jsx += '                    "leading-7 mb-4",\n';
-      jsx += '                    textColor\n';
-      jsx += '                  )}\n';
-      jsx += '                  {...props.attributes}\n';
-      jsx += '                >\n';
-      jsx += '                  {props.children}\n';
-      jsx += '                </p>\n';
-      jsx += '              )}\n';
-      jsx += '              placeholder="Type content here..."\n';
-      jsx += '              allowedFeatures={[\n';
-      jsx += '                types.RichTextFeatures.Bold,\n';
-      jsx += '                types.RichTextFeatures.Link,\n';
-      jsx += '              ]}\n';
-      jsx += '              renderLink={({ children, href, target, rel }) => (\n';
-      jsx += '                <Link\n';
-      jsx += '                  href={href}\n';
-      jsx += '                  target={target}\n';
-      jsx += '                  rel={rel}\n';
-      jsx += '                  className="inline-block text-sky-500 hover:text-sky-600 hover:-translate-y-px transition-all ease-out duration-150"\n';
-      jsx += '                >\n';
-      jsx += '                  {children}\n';
-      jsx += '                </Link>\n';
-      jsx += '              )}\n';
-      jsx += '            />\n';
-    }
-    
-    // Add buttons if present
-    if (hasButtons) {
-      jsx += '            <div className={classNames("flex mt-4 space-x-3", justifyContentClass)}>\n';
-      jsx += '              <Repeater propName="buttons" items={buttons} />\n';
-      jsx += '            </div>\n';
+    // Add actual content from the component's children
+    if (hasChildren) {
+      component.children.forEach(child => {
+        if (child.type === 'heading' || child.name.includes('heading')) {
+          const headingContent = child.content 
+            ? child.content.replace(/<\/?[^>]+(>|$)/g, '').trim() 
+            : 'Heading';
+          
+          jsx += '            <RichText\n';
+          jsx += '              propName="title"\n';
+          jsx += `              value={{ text: ${JSON.stringify(headingContent)} }}\n`;
+          jsx += '              renderBlock={(props) => (\n';
+          jsx += '                <h2\n';
+          jsx += '                  className={classNames(\n';
+          jsx += '                    "mt-0 text-2xl leading-7",\n';
+          jsx += '                    extraBoldTitle ? "font-extrabold" : "font-bold",\n';
+          jsx += '                    "mb-4",\n';
+          jsx += '                    titleColor\n';
+          jsx += '                  )}\n';
+          jsx += '                  {...props.attributes}\n';
+          jsx += '                >\n';
+          jsx += '                  {props.children}\n';
+          jsx += '                </h2>\n';
+          jsx += '              )}\n';
+          jsx += '              placeholder="Type a title..."\n';
+          jsx += '              allowedFeatures={[types.RichTextFeatures.Highlight]}\n';
+          jsx += '            />\n';
+        } else if (child.type === 'text-editor' || child.name.includes('text')) {
+          const textContent = child.content 
+            ? child.content.replace(/<\/?[^>]+(>|$)/g, '').trim() 
+            : 'Text content';
+          
+          jsx += '            <RichText\n';
+          jsx += '              propName="text"\n';
+          jsx += `              value={{ text: ${JSON.stringify(textContent)} }}\n`;
+          jsx += '              renderBlock={(props) => (\n';
+          jsx += '                <p\n';
+          jsx += '                  className={classNames(\n';
+          jsx += '                    "leading-7 mb-4",\n';
+          jsx += '                    textColor\n';
+          jsx += '                  )}\n';
+          jsx += '                  {...props.attributes}\n';
+          jsx += '                >\n';
+          jsx += '                  {props.children}\n';
+          jsx += '                </p>\n';
+          jsx += '              )}\n';
+          jsx += '              placeholder="Type content here..."\n';
+          jsx += '              allowedFeatures={[\n';
+          jsx += '                types.RichTextFeatures.Bold,\n';
+          jsx += '                types.RichTextFeatures.Link,\n';
+          jsx += '              ]}\n';
+          jsx += '              renderLink={({ children, href, target, rel }) => (\n';
+          jsx += '                <Link\n';
+          jsx += '                  href={href}\n';
+          jsx += '                  target={target}\n';
+          jsx += '                  rel={rel}\n';
+          jsx += '                  className="inline-block text-sky-500 hover:text-sky-600 hover:-translate-y-px transition-all ease-out duration-150"\n';
+          jsx += '                >\n';
+          jsx += '                  {children}\n';
+          jsx += '                </Link>\n';
+          jsx += '              )}\n';
+          jsx += '            />\n';
+        } else if (child.type === 'button' || child.name.includes('button')) {
+          // Extract button text and link from content
+          let buttonText = 'Button';
+          let buttonLink = '#';
+          
+          if (child.content) {
+            const textMatch = child.content.match(/<span[^>]*>(.*?)<\/span>/);
+            if (textMatch && textMatch[1]) {
+              buttonText = textMatch[1].trim();
+            }
+            
+            const linkMatch = child.content.match(/href=["'](.*?)["']/);
+            if (linkMatch && linkMatch[1]) {
+              buttonLink = linkMatch[1];
+            }
+          }
+          
+          jsx += '            <div className={classNames("flex mt-4", justifyContentClass)}>\n';
+          jsx += '              <Link\n';
+          jsx += `                href="${buttonLink}"\n`;
+          jsx += '                className={classNames(\n';
+          jsx += '                  "inline-block px-5 py-3 rounded-md font-bold",\n';
+          jsx += '                  "transition-all ease-out duration-150",\n';
+          jsx += '                  "text-white bg-blue-600 hover:bg-blue-700"\n';
+          jsx += '                )}\n';
+          jsx += '              >\n';
+          jsx += `                ${buttonText}\n`;
+          jsx += '              </Link>\n';
+          jsx += '            </div>\n';
+        }
+      });
     }
     
     jsx += '          </div>\n';
     
     // Add media side if there are images
     if (hasImages) {
-      jsx += '          <div className="w-full md:w-1/2 mt-6 md:mt-0">\n';
-      jsx += '            <Image\n';
-      jsx += '              propName="imageSource"\n';
-      jsx += '              source={imageSource}\n';
-      jsx += '              alt="Image"\n';
-      jsx += '              imageClassName={classNames(\n';
-      jsx += '                { "rounded-lg": isRounded },\n';
-      jsx += '                { "shadow-2xl": hasShadow },\n';
-      jsx += '                { "md:h-[500px] md:max-w-none object-cover": bigImage }\n';
-      jsx += '              )}\n';
-      jsx += '            />\n';
-      jsx += '          </div>\n';
+      // Find the first image child
+      const imageChild = component.children.find(child => 
+        child.type === 'image' || child.name.includes('image'));
+      
+      if (imageChild) {
+        let imageUrl = '';
+        
+        if (imageChild.content) {
+          const imgMatch = imageChild.content.match(/<img.*?src=["'](.*?)["']/);
+          if (imgMatch && imgMatch[1]) {
+            imageUrl = imgMatch[1];
+          }
+        }
+        
+        if (imageChild.settings?.image?.url) {
+          imageUrl = imageChild.settings.image.url;
+        }
+        
+        jsx += '          <div className="w-full md:w-1/2 mt-6 md:mt-0">\n';
+        jsx += '            <Image\n';
+        jsx += '              propName="imageSource"\n';
+        if (imageUrl) {
+          jsx += '              source={{\n';
+          jsx += `                src: "${imageUrl}",\n`;
+          jsx += `                alt: "${imageChild.settings?.alt_text || 'Image'}"\n`;
+          jsx += '              }}\n';
+        } else {
+          jsx += '              source={imageSource}\n';
+        }
+        jsx += '              alt="Image"\n';
+        jsx += '              imageClassName={classNames(\n';
+        jsx += '                { "rounded-lg": isRounded },\n';
+        jsx += '                { "shadow-2xl": hasShadow },\n';
+        jsx += '                { "md:h-[500px] md:max-w-none object-cover": bigImage }\n';
+        jsx += '              )}\n';
+        jsx += '            />\n';
+        jsx += '          </div>\n';
+      }
     }
     
     jsx += '        </div>\n';
   } else {
     // Generic container for any other content
     jsx += '        <div className="relative flex flex-wrap">\n';
-    jsx += '          {/* Section content */}\n';
+    
+    // Include actual content from the component if available
+    if (component.content) {
+      jsx += '          <div dangerouslySetInnerHTML={{ __html: `\n';
+      jsx += `            ${component.content.replace(/`/g, '\\`')}\n`;
+      jsx += '          ` }} />\n';
+    } else {
+      jsx += '          {/* Section content */}\n';
+    }
+    
     jsx += '        </div>\n';
   }
   
@@ -452,10 +523,36 @@ const generateColumnJSX = (component: ReactBricksComponent): string => {
   // Add children content if exists
   if (component.children && component.children.length > 0) {
     jsx += '      <div className="flex flex-col space-y-4">\n';
+    
+    // Include each child's content preview
     component.children.forEach((child, index) => {
-      jsx += `        {/* Child component ${index + 1} (${child.type || child.name}) */}\n`;
+      if (child.type === 'heading' || child.name.includes('heading')) {
+        const headingContent = child.content 
+          ? child.content.replace(/<\/?[^>]+(>|$)/g, '').trim() 
+          : `Heading ${index + 1}`;
+        const headingTag = child.tag || 'h2';
+        
+        jsx += `        <${headingTag} className="font-bold">${headingContent}</${headingTag}>\n`;
+      } else if (child.type === 'text-editor' || child.name.includes('text')) {
+        const textContent = child.content 
+          ? child.content.replace(/<\/?[^>]+(>|$)/g, '').trim() 
+          : `Text content ${index + 1}`;
+        
+        jsx += `        <p>${textContent}</p>\n`;
+      } else if (child.content) {
+        jsx += '        <div dangerouslySetInnerHTML={{ __html: `\n';
+        jsx += `          ${child.content.replace(/`/g, '\\`')}\n`;
+        jsx += '        ` }} />\n';
+      } else {
+        jsx += `        {/* Child component ${index + 1} (${child.type || child.name}) */}\n`;
+      }
     });
+    
     jsx += '      </div>\n';
+  } else if (component.content) {
+    jsx += '      <div dangerouslySetInnerHTML={{ __html: `\n';
+    jsx += `        ${component.content.replace(/`/g, '\\`')}\n`;
+    jsx += '      ` }} />\n';
   } else {
     jsx += '      {/* Column content */}\n';
   }
@@ -472,16 +569,17 @@ const generateHeadingJSX = (component: ReactBricksComponent): string => {
   // Extract content from component for more specific template
   const headingContent = component.content || 'Heading';
   const cleanContent = headingContent.replace(/<\/?[^>]+(>|$)/g, '').trim();
-  const headingTag = component.tag || 'h2';
+  const headingTag = component.tag || component.props.tag || 'h2';
+  const fontSize = component.settings?.typography_font_size || '2xl';
   
   let jsx = '';
   jsx += '    <RichText\n';
   jsx += '      propName="title"\n';
-  jsx += '      value={title || { text: ' + JSON.stringify(cleanContent) + ' }}\n';
+  jsx += `      value={title || { text: ${JSON.stringify(cleanContent)} }}\n`;
   jsx += '      renderBlock={(props) => (\n';
   jsx += `        <${headingTag}\n`;
   jsx += '          className={classNames(\n';
-  jsx += '            "mt-0 text-2xl leading-7",\n';
+  jsx += `            "mt-0 text-${fontSize} leading-7",\n`;
   jsx += '            extraBoldTitle ? "font-extrabold" : "font-bold",\n';
   jsx += '            "mb-3",\n';
   jsx += '            titleColor\n';
@@ -505,16 +603,17 @@ const generateTextJSX = (component: ReactBricksComponent): string => {
   // Extract content for more specific template
   const textContent = component.content || 'Text content';
   const cleanContent = textContent.replace(/<\/?[^>]+(>|$)/g, '').trim();
+  const textAlign = component.styles.textAlign || component.props.textAlign || 'left';
   
   let jsx = '';
   jsx += '    <RichText\n';
   jsx += '      propName="text"\n';
-  jsx += '      value={text || { text: ' + JSON.stringify(cleanContent) + ' }}\n';
+  jsx += `      value={text || { text: ${JSON.stringify(cleanContent)} }}\n`;
   jsx += '      renderBlock={(props) => (\n';
   jsx += '        <p\n';
   jsx += '          className={classNames(\n';
   jsx += '            "leading-7 mb-3",\n';
-  jsx += '            textAlign === "center" ? "text-center" : textAlign === "right" ? "text-right" : "text-left",\n';
+  jsx += `            "${textAlign === 'center' ? 'text-center' : textAlign === 'right' ? 'text-right' : 'text-left'}",\n`;
   jsx += '            textColor\n';
   jsx += '          )}\n';
   jsx += '          {...props.attributes}\n';
@@ -549,16 +648,25 @@ const generateImageJSX = (component: ReactBricksComponent): string => {
   let jsx = '';
   // Try to extract image URL from component
   let imageUrl = '';
+  let altText = 'Image';
   
   if (component.content) {
     const imgMatch = component.content.match(/<img.*?src=["'](.*?)["']/);
     if (imgMatch && imgMatch[1]) {
       imageUrl = imgMatch[1];
     }
+    
+    const altMatch = component.content.match(/alt=["'](.*?)["']/);
+    if (altMatch && altMatch[1]) {
+      altText = altMatch[1];
+    }
   }
   
   if (component.settings?.image?.url) {
     imageUrl = component.settings.image.url;
+    if (component.settings.alt_text) {
+      altText = component.settings.alt_text;
+    }
   }
   
   jsx += '    <Image\n';
@@ -566,13 +674,13 @@ const generateImageJSX = (component: ReactBricksComponent): string => {
   jsx += '      source={imageSource || {\n';
   if (imageUrl) {
     jsx += `        src: "${imageUrl}",\n`;
-    jsx += '        alt: "' + (component.settings?.alt_text || 'Image') + '",\n';
+    jsx += `        alt: "${altText}",\n`;
   } else {
     jsx += '        src: photos.DESK_MAC.src,\n';
     jsx += '        alt: photos.DESK_MAC.alt,\n';
   }
   jsx += '      }}\n';
-  jsx += '      alt="Image"\n';
+  jsx += `      alt="${altText}"\n`;
   jsx += '      imageClassName={classNames(\n';
   jsx += '        isRounded && "rounded-lg",\n';
   jsx += '        hasShadow && "shadow-2xl"\n';
@@ -589,323 +697,45 @@ const generateButtonJSX = (component: ReactBricksComponent): string => {
   // Extract button text and link if available
   let buttonText = 'Button';
   let buttonLink = '#';
+  let isTargetBlank = false;
+  let buttonType = component.settings?.button_type || 'solid';
   
   if (component.content) {
-    const textMatch = component.content.match(/>([^<]+)</);
+    // Try to find button text from span
+    const textMatch = component.content.match(/<span[^>]*>(.*?)<\/span>/);
     if (textMatch && textMatch[1]) {
       buttonText = textMatch[1].trim();
     }
     
+    // Or try direct text between tags
+    if (!buttonText || buttonText === 'Button') {
+      const directTextMatch = component.content.match(/>([^<]+)</);
+      if (directTextMatch && directTextMatch[1]) {
+        buttonText = directTextMatch[1].trim();
+      }
+    }
+    
+    // Find link url
     const linkMatch = component.content.match(/href=["'](.*?)["']/);
     if (linkMatch && linkMatch[1]) {
       buttonLink = linkMatch[1];
     }
-  }
-  
-  let jsx = '';
-  jsx += '    <Link\n';
-  jsx += `      href={href || "${buttonLink}"}\n`;
-  jsx += '      target={isTargetBlank ? "_blank" : undefined}\n';
-  jsx += '      className={classNames(\n';
-  jsx += '        "inline-block px-5 py-3 rounded-md font-bold",\n';
-  jsx += '        "transition-all ease-out duration-150",\n';
-  jsx += '        isBigButton ? "text-lg" : "text-base",\n';
-  jsx += '        type === "solid" && "text-white bg-blue-600 hover:bg-blue-700",\n';
-  jsx += '        type === "outline" && "text-blue-600 border border-blue-600 hover:bg-blue-50",\n';
-  jsx += '        type === "link" && "text-blue-600 hover:text-blue-700 hover:underline"\n';
-  jsx += '      )}\n';
-  jsx += '    >\n';
-  jsx += `      {text || "${buttonText}"}\n`;
-  jsx += '    </Link>\n';
-  
-  return jsx;
-};
-
-/**
- * Generate JSX for a Video component
- */
-const generateVideoJSX = (component: ReactBricksComponent): string => {
-  let jsx = '';
-  let videoType = 'streaming';
-  let platform = 'youtube';
-  let videoId = '';
-  
-  // Try to extract video ID if available
-  if (component.content) {
-    if (component.content.includes('youtube')) {
-      const youtubeMatch = component.content.match(/youtube.com\/embed\/([^"&?/\s]+)/);
-      if (youtubeMatch && youtubeMatch[1]) {
-        videoId = youtubeMatch[1];
-      }
-    } else if (component.content.includes('vimeo')) {
-      const vimeoMatch = component.content.match(/vimeo.com\/(?:video\/)?([0-9]+)/);
-      if (vimeoMatch && vimeoMatch[1]) {
-        platform = 'vimeo';
-        videoId = vimeoMatch[1];
-      }
-    } else if (component.content.includes('<video')) {
-      videoType = 'file';
-    }
-  }
-  
-  jsx += '    <Video\n';
-  jsx += `      type="${videoType}"\n`;
-  
-  if (videoType === 'streaming') {
-    jsx += `      platform="${platform}"\n`;
-    if (videoId) {
-      jsx += `      videoId="${videoId}"\n`;
-    } else {
-      jsx += '      videoId="dQw4w9WgXcQ" // Default YouTube video\n';
-    }
-  } else {
-    jsx += '      videoFile={videoFile}\n';
-  }
-  
-  jsx += '      className="w-full rounded"\n';
-  jsx += '    />\n';
-  
-  return jsx;
-};
-
-/**
- * Generate the schema for the React Bricks component
- */
-const generateSchema = (component: ReactBricksComponent): string => {
-  const componentName = pascalCase(component.name);
-  
-  let schema = `${componentName}.schema = {\n`;
-  schema += `  name: '${component.name}',\n`;
-  schema += `  label: '${component.label}',\n`;
-  schema += `  category: '${component.category}',\n`;
-  
-  // Generate getDefaultProps
-  schema += '  getDefaultProps: () => ({\n';
-  
-  // Add appropriate defaults based on component type
-  if (component.type === 'section' || component.name.includes('section')) {
-    schema += '    ...sectionDefaults,\n';
-  } else {
-    schema += '    backgroundColor: { color: "white", className: "bg-white" },\n';
-  }
-  
-  // Component-specific default props
-  if (component.type === 'heading' || component.name.includes('heading')) {
-    const headingContent = component.content 
-      ? component.content.replace(/<\/?[^>]+(>|$)/g, '').trim() 
-      : 'Heading';
-    schema += `    title: "${headingContent}",\n`;
-    schema += '    tag: "h2",\n';
-  }
-  
-  if (component.type === 'text-editor' || component.name.includes('text')) {
-    const textContent = component.content 
-      ? component.content.replace(/<\/?[^>]+(>|$)/g, '').trim() 
-      : 'Text content';
-    schema += `    text: "${textContent}",\n`;
-  }
-  
-  if (component.type === 'image' || component.name.includes('image')) {
-    schema += '    imageSource: photos.DESK_MAC,\n';
-    schema += '    isRounded: false,\n';
-    schema += '    hasShadow: false,\n';
-  }
-  
-  if (component.type === 'button' || component.name.includes('button')) {
-    const buttonText = component.content && component.content.match(/>([^<]+)</)
-      ? component.content.match(/>([^<]+)</)[1].trim()
-      : 'Button';
-    schema += `    text: "${buttonText}",\n`;
-    schema += '    href: "#",\n';
-    schema += '    type: "solid",\n';
-    schema += '    buttonColor: buttonColors.BLUE.value,\n';
-  }
-  
-  schema += '  }),\n';
-  
-  // Generate sideEditProps
-  schema += '  sideEditProps: [\n';
-  
-  // Common side edit props for layout components
-  if (component.type === 'section' || component.name.includes('section')) {
-    schema += '    backgroundSideGroup,\n';
-    schema += '    paddingBordersSideGroup,\n';
     
-    schema += '    {\n';
-    schema += '      groupName: "Layout",\n';
-    schema += '      props: [\n';
-    schema += '        {\n';
-    schema += '          name: "imageSide",\n';
-    schema += '          label: "Image side",\n';
-    schema += '          type: types.SideEditPropType.Select,\n';
-    schema += '          selectOptions: {\n';
-    schema += '            display: types.OptionsDisplay.Radio,\n';
-    schema += '            options: [\n';
-    schema += '              { value: "right", label: "Right" },\n';
-    schema += '              { value: "left", label: "Left" },\n';
-    schema += '            ],\n';
-    schema += '          },\n';
-    schema += '        },\n';
-    schema += '      ],\n';
-    schema += '    },\n';
-  } else {
-    schema += '    paddingBordersSideGroup,\n';
+    // Check if target blank
+    if (component.content.includes('target="_blank"')) {
+      isTargetBlank = true;
+    }
   }
   
-  // Component-specific side edit props
-  if (component.type === 'heading' || component.name.includes('heading')) {
-    schema += '    {\n';
-    schema += '      groupName: "Typography",\n';
-    schema += '      props: [\n';
-    schema += '        {\n';
-    schema += '          name: "tag",\n';
-    schema += '          label: "Tag",\n';
-    schema += '          type: types.SideEditPropType.Select,\n';
-    schema += '          selectOptions: {\n';
-    schema += '            display: types.OptionsDisplay.Radio,\n';
-    schema += '            options: [\n';
-    schema += '              { value: "h1", label: "Heading 1" },\n';
-    schema += '              { value: "h2", label: "Heading 2" },\n';
-    schema += '              { value: "h3", label: "Heading 3" },\n';
-    schema += '              { value: "h4", label: "Heading 4" },\n';
-    schema += '              { value: "h5", label: "Heading 5" },\n';
-    schema += '              { value: "h6", label: "Heading 6" },\n';
-    schema += '            ],\n';
-    schema += '          },\n';
-    schema += '        },\n';
-    schema += '        {\n';
-    schema += '          name: "extraBoldTitle",\n';
-    schema += '          label: "Extra Bold",\n';
-    schema += '          type: types.SideEditPropType.Boolean,\n';
-    schema += '        },\n';
-    schema += '      ],\n';
-    schema += '    },\n';
+  // Get button color from classes or settings
+  let buttonColor = 'blue';
+  if (component.styles.backgroundColor) {
+    if (component.styles.backgroundColor.includes('blue')) buttonColor = 'blue';
+    if (component.styles.backgroundColor.includes('green')) buttonColor = 'green';
+    if (component.styles.backgroundColor.includes('red')) buttonColor = 'red';
+    if (component.styles.backgroundColor.includes('purple')) buttonColor = 'purple';
+    if (component.styles.backgroundColor.includes('pink')) buttonColor = 'pink';
   }
   
-  if (component.type === 'text-editor' || component.name.includes('text')) {
-    schema += '    {\n';
-    schema += '      groupName: "Typography",\n';
-    schema += '      props: [\n';
-    schema += '        {\n';
-    schema += '          name: "textAlign",\n';
-    schema += '          label: "Text Alignment",\n';
-    schema += '          type: types.SideEditPropType.Select,\n';
-    schema += '          selectOptions: {\n';
-    schema += '            display: types.OptionsDisplay.Radio,\n';
-    schema += '            options: [\n';
-    schema += '              { value: "left", label: "Left" },\n';
-    schema += '              { value: "center", label: "Center" },\n';
-    schema += '              { value: "right", label: "Right" },\n';
-    schema += '            ],\n';
-    schema += '          },\n';
-    schema += '        },\n';
-    schema += '      ],\n';
-    schema += '    },\n';
-  }
-  
-  if (component.type === 'image' || component.name.includes('image')) {
-    schema += '    {\n';
-    schema += '      groupName: "Image Settings",\n';
-    schema += '      props: [\n';
-    schema += '        {\n';
-    schema += '          name: "isRounded",\n';
-    schema += '          label: "Rounded Corners",\n';
-    schema += '          type: types.SideEditPropType.Boolean,\n';
-    schema += '        },\n';
-    schema += '        {\n';
-    schema += '          name: "hasShadow",\n';
-    schema += '          label: "Show Shadow",\n';
-    schema += '          type: types.SideEditPropType.Boolean,\n';
-    schema += '        },\n';
-    schema += '      ],\n';
-    schema += '    },\n';
-  }
-  
-  if (component.type === 'button' || component.name.includes('button')) {
-    schema += '    {\n';
-    schema += '      groupName: "Button",\n';
-    schema += '      props: [\n';
-    schema += '        {\n';
-    schema += '          name: "type",\n';
-    schema += '          label: "Type",\n';
-    schema += '          type: types.SideEditPropType.Select,\n';
-    schema += '          selectOptions: {\n';
-    schema += '            display: types.OptionsDisplay.Radio,\n';
-    schema += '            options: [\n';
-    schema += '              { value: "solid", label: "Solid" },\n';
-    schema += '              { value: "outline", label: "Outline" },\n';
-    schema += '              { value: "link", label: "Link" },\n';
-    schema += '            ],\n';
-    schema += '          },\n';
-    schema += '        },\n';
-    schema += '        {\n';
-    schema += '          name: "href",\n';
-    schema += '          label: "Link (URL)",\n';
-    schema += '          type: types.SideEditPropType.Text,\n';
-    schema += '        },\n';
-    schema += '        {\n';
-    schema += '          name: "isTargetBlank",\n';
-    schema += '          label: "Open in new window",\n';
-    schema += '          type: types.SideEditPropType.Boolean,\n';
-    schema += '        },\n';
-    schema += '        {\n';
-    schema += '          name: "isBigButton",\n';
-    schema += '          label: "Big button",\n';
-    schema += '          type: types.SideEditPropType.Boolean,\n';
-    schema += '        },\n';
-    schema += '      ],\n';
-    schema += '    },\n';
-  }
-  
-  // Close the schema
-  schema += '  ],\n';
-  
-  // Add repeaterItems if necessary based on component type
-  if (component.type === 'section' || component.name.includes('section')) {
-    schema += '  repeaterItems: [\n';
-    schema += '    {\n';
-    schema += '      name: "buttons",\n';
-    schema += '      itemType: "button",\n';
-    schema += '      itemLabel: "Button",\n';
-    schema += '      min: 0,\n';
-    schema += '      max: 2,\n';
-    schema += '    },\n';
-    schema += '  ],\n';
-  }
-  
-  schema += '};\n';
-  
-  return schema;
-};
-
-/**
- * Determine the TypeScript type for a prop based on its value
- */
-const determinePropType = (value: any): string => {
-  if (value === null || value === undefined) return 'any';
-  
-  const type = typeof value;
-  
-  if (type === 'boolean') return 'boolean';
-  if (type === 'number') return 'number';
-  if (type === 'string') return 'string';
-  
-  if (type === 'object') {
-    if (Array.isArray(value)) return 'any[]';
-    if (value.src || value.value) return 'types.IImageSource'; // Likely an image source
-    return 'Record<string, any>';
-  }
-  
-  return 'any';
-};
-
-/**
- * Convert kebab-case to PascalCase
- */
-const pascalCase = (str: string): string => {
-  return str
-    .split('-')
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-    .join('');
-};
-
+  // Button size
+  const isBigButton = component.classes.some(cls => cls.includes('elementor-size-lg') || cls.includes('elementor-size-xl'));
